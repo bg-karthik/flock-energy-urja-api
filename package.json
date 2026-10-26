@@ -1,0 +1,40 @@
+{
+  "name": "flock-energy-api",
+  "version": "1.0.0",
+  "description": "REST API wrapper for Urja Meter Ops legacy portal",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "investigate": "node scripts/investigate.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "testTimeout": 15000,
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios-cookiejar-support|tough-cookie)/)"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "playwright": "^1.64.1",
+    "supertest": "^7.3.1"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "axios-cookiejar-support": "^4.0.7",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "tough-cookie": "^4.1.4"
+  }
+}

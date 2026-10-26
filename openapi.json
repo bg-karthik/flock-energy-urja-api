@@ -1,0 +1,310 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Flock Energy — Urja Meter Ops API",
+    "description": "REST API wrapper around the Urja Meter Ops legacy portal.\n\nThis API proxies three verified internal portal endpoints discovered via Playwright network inspection. All data is read-only. Authentication is handled server-side using a persistent session cookie.\n\n**Data notes:**\n- Meter IDs follow the format `J` + 6 digits (e.g. `J100001`).\n- kWh and kVAh in consumption readings are **cumulative meter readings**, not interval deltas.\n- Timestamps are in `DD/MM/YYYY HH:mm` format as returned by the portal.\n- Consumption interval is 30 minutes.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Flock Energy Engineering Take-Home"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Health check",
+        "description": "Returns the operational status and current timestamp of the API wrapper service.",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "timestamp": { "type": "string", "example": "2026-10-26T05:45:53.574Z" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meters": {
+      "get": {
+        "operationId": "listMeters",
+        "summary": "List meters",
+        "description": "Returns a paginated list of smart meters. Internally queries `GET /portal/meters/search`. Page size is fixed at 20 by the portal.",
+        "tags": ["Meters"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search by meter ID or serial number. Empty string returns all meters.",
+            "required": false,
+            "schema": { "type": "string", "example": "J100001" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (1-indexed).",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated meter list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MeterListResponse" },
+                "example": {
+                  "data": [
+                    {
+                      "meterId": "J100001",
+                      "serialNo": "GE84132",
+                      "make": "L&T",
+                      "phaseType": "single",
+                      "installStatus": "Installed",
+                      "dtCode": "DT-002"
+                    }
+                  ],
+                  "pagination": {
+                    "total": 403,
+                    "page": 1,
+                    "pageSize": 20,
+                    "totalPages": 21
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "502": { "$ref": "#/components/responses/BadGateway" }
+        }
+      }
+    },
+    "/api/v1/meters/{id}": {
+      "get": {
+        "operationId": "getMeter",
+        "summary": "Get meter detail",
+        "description": "Returns nameplate data, GPS coordinates, and 7-level network hierarchy for a single meter. Combines data from `/meters/{id}/__data.json` and `/portal/meters/{id}/geo`.",
+        "tags": ["Meters"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Meter ID (format: J followed by 6 digits)",
+            "schema": { "type": "string", "pattern": "^J\\d{6}$", "example": "J100001" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meter detail object",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MeterDetail" },
+                "example": {
+                  "meterId": "J100001",
+                  "serialNo": "GE84132",
+                  "make": "L&T",
+                  "phaseType": "single",
+                  "installStatus": "Installed",
+                  "installType": "CT Operated",
+                  "location": { "latitude": 26.822136543835608, "longitude": 75.90718190602279 },
+                  "hierarchy": {
+                    "zone": "Jaipur Zone 2 (Z-02)",
+                    "circle": "Circle 2 (C-02)",
+                    "division": "Division 2 (D-02)",
+                    "subdivision": "Subdivision 2 (SD-02)",
+                    "subStation": "Substation 2 (SS-02)",
+                    "feeder": "Feeder 2 (F-002)",
+                    "dt": "Mansarovar DT 2 (DT-002)"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "502": { "$ref": "#/components/responses/BadGateway" }
+        }
+      }
+    },
+    "/api/v1/meters/{id}/consumption": {
+      "get": {
+        "operationId": "getMeterConsumption",
+        "summary": "Get meter consumption history",
+        "description": "Returns all available energy readings for a meter from `/portal/meters/{id}/energy`.\n\n**Important:** `kwh` and `kvah` are **cumulative meter readings** (odometer-style), not interval deltas. To calculate consumption in an interval, subtract consecutive readings. Readings are at 30-minute intervals.",
+        "tags": ["Meters"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Meter ID (format: J followed by 6 digits)",
+            "schema": { "type": "string", "pattern": "^J\\d{6}$", "example": "J100001" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption reading array",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ConsumptionResponse" },
+                "example": {
+                  "meterId": "J100001",
+                  "note": "kWh and kVAh are cumulative meter readings, not interval deltas. Interval: 30 minutes.",
+                  "count": 337,
+                  "data": [
+                    { "timestamp": "23/06/2026 23:30", "kwh": 42594.05, "kvah": 46001.58, "voltR": 231 },
+                    { "timestamp": "24/06/2026 00:00", "kwh": 42594.47, "kvah": 46002.02, "voltR": 230 }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "502": { "$ref": "#/components/responses/BadGateway" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Meter": {
+        "type": "object",
+        "properties": {
+          "meterId": { "type": "string", "example": "J100001" },
+          "serialNo": { "type": "string", "example": "GE84132" },
+          "make": { "type": "string", "example": "L&T" },
+          "phaseType": { "type": "string", "enum": ["single", "three"], "example": "single" },
+          "installStatus": { "type": "string", "enum": ["Installed", "Decommissioned", "Faulty"], "example": "Installed" },
+          "dtCode": { "type": "string", "example": "DT-002" }
+        }
+      },
+      "MeterListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Meter" }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer", "example": 403 },
+              "page": { "type": "integer", "example": 1 },
+              "pageSize": { "type": "integer", "example": 20 },
+              "totalPages": { "type": "integer", "example": 21 }
+            }
+          }
+        }
+      },
+      "MeterDetail": {
+        "type": "object",
+        "properties": {
+          "meterId": { "type": "string", "example": "J100001" },
+          "serialNo": { "type": "string", "example": "GE84132" },
+          "make": { "type": "string", "example": "L&T" },
+          "phaseType": { "type": "string", "example": "single" },
+          "installStatus": { "type": "string", "example": "Installed" },
+          "installType": { "type": "string", "example": "CT Operated" },
+          "location": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "latitude": { "type": "number", "example": 26.822136543835608 },
+              "longitude": { "type": "number", "example": 75.90718190602279 }
+            }
+          },
+          "hierarchy": {
+            "type": "object",
+            "properties": {
+              "zone": { "type": "string", "nullable": true },
+              "circle": { "type": "string", "nullable": true },
+              "division": { "type": "string", "nullable": true },
+              "subdivision": { "type": "string", "nullable": true },
+              "subStation": { "type": "string", "nullable": true },
+              "feeder": { "type": "string", "nullable": true },
+              "dt": { "type": "string", "nullable": true }
+            }
+          }
+        }
+      },
+      "ConsumptionReading": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "example": "24/06/2026 00:00", "description": "Format: DD/MM/YYYY HH:mm" },
+          "kwh": { "type": "number", "example": 42594.47, "description": "Cumulative kWh meter reading" },
+          "kvah": { "type": "number", "example": 46002.02, "description": "Cumulative kVAh meter reading" },
+          "voltR": { "type": "integer", "example": 230, "description": "R-phase voltage in Volts" }
+        }
+      },
+      "ConsumptionResponse": {
+        "type": "object",
+        "properties": {
+          "meterId": { "type": "string" },
+          "note": { "type": "string" },
+          "count": { "type": "integer" },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ConsumptionReading" }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "integer" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": { "status": 400, "message": "Invalid meter ID format" } }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Meter not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": { "status": 404, "message": "Meter not found: J999999" } }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "Portal communication error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": { "status": 502, "message": "Portal meter search failed with status 503" } }
+          }
+        }
+      }
+    }
+  }
+}
