@@ -53,7 +53,7 @@ This API acts as an adapter layer that abstracts away the legacy quirks, manages
   - SvelteKit indexed-array graph parser to extract nameplate and hierarchy fields from `__data.json`.
   - Type-safe parsing: string coordinates to floats, cumulative energy readings to numbers, voltage to integers.
 - **Interactive Documentation:** Interactive OpenAPI 3.0 / Swagger UI documentation served at `/docs`.
-- **Automated Testing:** 34 unit and integration tests across route validation, error handling, session management, and data normalization.
+- **Automated Testing:** 35 unit and integration tests across route validation, error handling, session management, and data normalization.
 
 ---
 
@@ -305,7 +305,7 @@ npm test
 npm run test:watch
 ```
 
-### Test Coverage Highlights (34 passing tests):
+### Test Coverage Highlights (35 passing tests):
 1. **Authentication Flow:** Successful POST `/login` with SvelteKit action headers; error handling on invalid credentials.
 2. **Session Lifecycle:** Detection of expired session via redirect headers or HTML markers; automatic re-authentication; at most 1 retry guard against infinite loops.
 3. **Meter Catalog:** Listing pagination (`total`, `page`, `pageSize`, `totalPages`), query parameter filtering, page validation (`page < 1`, non-integer).

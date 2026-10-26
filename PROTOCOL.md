@@ -393,4 +393,4 @@ Two ways to get meter detail data. Prefer the JSON API.
 | 2026-10-24 | Initial template created |
 | 2026-10-24 | Populated from browser subagent investigation (partially verified) |
 | 2026-10-26 | **Full rewrite from Playwright automated investigation.** All authentication, meter search API, consumption API, and transformer API findings verified with direct network evidence. Discovered `/portal/*` internal API routes. Corrected SvelteKit enhanced form submission pattern (HTTP 200 JSON, not 303 redirect). |
-| 2026-10-26 | **Live Backend Verification & Cookie Confirmation.** Verified `__Secure-better-auth.session_token` cookie and SvelteKit `Origin`/`Referer` CSRF requirements against live portal. Implemented complete Express REST API, automated test suite (34 passing tests), and OpenAPI documentation. |
+| 2026-10-26 | **Live Backend Verification & Cookie Confirmation.** Verified `__Secure-better-auth.session_token` cookie and SvelteKit `Origin`/`Referer` CSRF requirements against live portal. Implemented complete Express REST API, automated test suite (35 passing tests), and OpenAPI documentation. |
